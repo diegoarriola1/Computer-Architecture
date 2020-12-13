@@ -12,8 +12,6 @@ class CPU:
         self.reg = [0] * 8
         self.reg[7] = 0xF4
         self.pc = 0
-        self.sp = 7
-        self.reg[self.sp] = 0xF4
         self.halted = False
 
     def ram_read(self, address):
@@ -85,6 +83,8 @@ class CPU:
         POP = 0b01000110
         PUSH = 0b01000101
 
+        SP = 7
+
         while running:
             IR = self.ram[self.pc]
             operand_a = self.ram_read(self.pc + 1)
@@ -101,15 +101,12 @@ class CPU:
                 self.alu("MUL", operand_a, operand_b)
                 self.pc += 3
             elif IR == PUSH:
-                self.reg[self.sp] -= 1
-                reg_of_value = self.reg[operand_a]
-                val_in_reg = self.reg[reg_of_value]
-                self.reg[self.sp] = val_in_reg
+                self.reg[SP] -= 1
+                self.ram_write(self.reg[operand_a], self.reg[SP])
                 self.pc += 2
             elif IR == POP:
-                reg_to_pop_val = self.reg[operand_a]
-                self.reg[reg_to_pop_val] = self.reg[self.sp]
-                self.reg[self.sp] += 1
+                self.reg[operand_a] = self.ram_read(self.reg[SP])
+                self.reg[SP] += 1
                 self.pc += 2
             else:
                 print('Error')
