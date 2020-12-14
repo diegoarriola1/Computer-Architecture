@@ -13,6 +13,8 @@ class CPU:
         self.reg[7] = 0xF4
         self.pc = 0
         self.halted = False
+        self.sp = self.reg[7]
+        self.flags = [0, 0, 0, 0, 0, 'L', 'G', 'E']
 
     def ram_read(self, address):
         """
@@ -49,7 +51,20 @@ class CPU:
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
         elif op == "MUL":
-            self.reg[reg_a] *= self.reg[reg_b]
+            self.reg[reg_a] = self.reg[reg_a] * self.reg[reg_b]
+        elif op == "CMP":
+            if self.reg[reg_a] == self.reg[reg_b]:
+                self.flags[7] = 1
+            else:
+                self.flags[7] = 0
+            if self.reg[reg_a] < self.reg[reg_b]:
+                self.flags[5] = 1
+            else:
+                self.flags[5] = 0
+            if self.reg[reg_a] > self.reg[reg_b]:
+                self.flags[6] = 1
+            else:
+                self.flags[6] = 0
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -82,8 +97,12 @@ class CPU:
         MUL = 0b10100010
         POP = 0b01000110
         PUSH = 0b01000101
-
-        SP = 7
+        CALL = 0b01010000
+        RET = 0b00010001
+        CMP = 0b10100111
+        JMP = 0b01010100
+        JEQ = 0b01010101
+        JNE = 0b01010110
 
         while running:
             IR = self.ram[self.pc]
@@ -101,13 +120,52 @@ class CPU:
                 self.alu("MUL", operand_a, operand_b)
                 self.pc += 3
             elif IR == PUSH:
-                self.reg[SP] -= 1
-                self.ram_write(self.reg[operand_a], self.reg[SP])
+                # Decrement the SP
+                self.sp -= 1
+                # Get the value of the register
+                value = self.reg[operand_a]
+                # Store the value in memory at SP
+                self.ram_write(self.sp, value)
                 self.pc += 2
             elif IR == POP:
-                self.reg[operand_a] = self.ram_read(self.reg[SP])
-                self.reg[SP] += 1
+                # Reverse what we did in PUSH
+                value = self.ram_read(self.sp)
+                self.reg[operand_a] = value
+                self.sp += 1
                 self.pc += 2
+            elif IR == CALL:
+                # Store our return address
+                return_address = self.pc + 2
+                # Push to the stack
+                self.sp -= 1
+                self.ram[self.sp] = return_address
+                # Set the PC to the subroutine address
+                subroutine_address = self.reg[operand_a]
+                self.pc = subroutine_address
+            elif IR == RET:
+                # Pop the return address off the stack
+                return_address = self.ram[self.sp]
+                self.sp += 1
+                # Store the return address in the PC
+                self.pc = return_address
+            elif IR == CMP:
+                self.alu('CMP', operand_a, operand_b)
+                self.pc += 3
+
+            elif IR == JMP:
+                self.pc = self.reg[operand_a]
+
+            elif IR == JEQ:
+                if self.flags[7] == 1:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2
+
+            elif IR == JNE:
+                if self.flags[7] != 1:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2
             else:
                 print('Error')
                 sys.exit()
